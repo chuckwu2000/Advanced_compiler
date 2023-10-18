@@ -4,6 +4,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include <iostream>
 #include <cstring>
+#include  <stdio.h>
+#include  <math.h>
 
 using namespace llvm;
 using namespace std;
@@ -15,7 +17,8 @@ typedef struct array_element
 	int ind_var_x;
 	int ind_var_y;
 }array_element_type;
-
+#include  <stdio.h>
+#include  <math.h>
 namespace {
 
 struct HW1Pass : public PassInfoMixin<HW1Pass> {
@@ -169,6 +172,67 @@ PreservedAnalyses HW1Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 		}
 	}
 */
+	/*====Flow Dependency====*/
+	errs()<<"====Flow Dependency====\n";
+	for(int k = 0;k < statement_total;k++)							//choose a statement
+	{
+		SmallVector<int, 1000> read_vec;
+		array_element_type array_write = statement_vec[k].back();
+		for(int i = ind_var_lowerbound;i < ind_var_upperbound;i++)	//choose an iteration
+		{
+			int write_val = array_write.ind_var_x * i + array_write.ind_var_y;
+			for(int j = i;j < ind_var_upperbound;j++)				//only behind this iteration can have dependent
+			{
+				if(j == i)											//check tail of statement in this iteration
+				{
+					for(int s = k + 1;s < statement_total;s++)		//tail of statement
+					{
+						array_vec_type tmp_vec = statement_vec[s];
+						for(int a = 0;a < tmp_vec.size() - 1;a++)	//the last one is assign's LHS
+						{
+							array_element_type array_read = tmp_vec[a];
+							if(strcmp(array_read.array_name, array_write.array_name) == 0)
+							{
+								int read_val = array_read.ind_var_x * j + array_read.ind_var_y;
+								if(read_val == write_val)
+								{
+									errs()<<"(i="<<i<<",i="<<j<<")\n";
+									errs()<<array_write.array_name<<":S"<<k+1<<" -----> S"<<s+1<<"\n";
+								}
+							}
+						}
+					}
+				}
+				else
+				{
+					for(int s = 0;s < statement_total;s++)			//all of statement
+					{
+						array_vec_type tmp_vec = statement_vec[s];
+						for(int a = 0;a < tmp_vec.size() - 1;a++)	//the last one is assign's LHS
+						{
+							array_element_type array_read = tmp_vec[a];
+							if(strcmp(array_read.array_name, array_write.array_name) == 0)
+							{
+								int read_val = array_read.ind_var_x * j + array_read.ind_var_y;
+								if(read_val == write_val)
+								{
+									errs()<<"(i="<<i<<",i="<<j<<")\n";
+									errs()<<array_write.array_name<<":S"<<k+1<<" -----> S"<<s+1<<"\n";
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/*====Anti-Dependency====*/
+	errs()<<"====Anti-Dependency====\n";
+
+	/*====Output Dependency====*/
+	errs()<<"====Output Dependency====\n";
+
 	errs() << "[HW1]: " << F.getName() << '\n';
 	return PreservedAnalyses::all();
 }

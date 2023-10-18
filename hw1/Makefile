@@ -22,7 +22,7 @@ test1.ll: test1.c
 test2.ll: test2.c
 	$(CXX) $(IRFLAGS) -o $@ $<
 
-run: test2.ll hw1.so
+run: test1.ll hw1.so
 	#$(OPT) -time-passes -disable-output -load-pass-plugin=./hw1.so -passes='hw1' $<
 	$(OPT) -disable-output -load-pass-plugin=./hw1.so -passes='hw1' $<
 
