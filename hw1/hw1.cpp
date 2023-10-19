@@ -4,8 +4,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include <iostream>
 #include <cstring>
-#include  <stdio.h>
-#include  <math.h>
 
 using namespace llvm;
 using namespace std;
@@ -176,7 +174,6 @@ PreservedAnalyses HW1Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 	errs()<<"====Flow Dependency====\n";
 	for(int k = 0;k < statement_total;k++)							//choose a statement
 	{
-		SmallVector<int, 1000> read_vec;
 		array_element_type array_write = statement_vec[k].back();
 		for(int i = ind_var_lowerbound;i < ind_var_upperbound;i++)	//choose an iteration
 		{
@@ -229,11 +226,100 @@ PreservedAnalyses HW1Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 
 	/*====Anti-Dependency====*/
 	errs()<<"====Anti-Dependency====\n";
+	for(int k = 0;k < statement_total;k++)							//choose a statement
+	{
+		array_vec_type tmp_vec = statement_vec[k];
+		for(int a = 0;a < tmp_vec.size() - 1;a++)   //the last one is assign's LHS
+		{
+			array_element_type array_read = tmp_vec[a];
+			for(int i = ind_var_lowerbound;i < ind_var_upperbound;i++)  //choose an iteration
+			{
+				int read_val = array_read.ind_var_x * i + array_read.ind_var_y;
+				for(int j = i;j < ind_var_upperbound;j++)               //only behind this iteration can have dependent
+				{
+					if(j == i)
+					{
+						for(int s = k + 1;s < statement_total;s++)      //tail of statement
+						{
+							array_element_type array_write = statement_vec[s].back();
+							if(strcmp(array_read.array_name, array_write.array_name) == 0)
+							{
+								int write_val = array_write.ind_var_x * j + array_write.ind_var_y;
+								if(read_val == write_val)
+								{
+									errs()<<"(i="<<i<<",i="<<j<<")\n";
+									errs()<<array_write.array_name<<":S"<<k+1<<" --A--> S"<<s+1<<"\n";
+								}
+							}
+						}
+					}
+					else
+					{
+						for(int s = 0;s < statement_total;s++)      //all of statement
+						{
+							array_element_type array_write = statement_vec[s].back();
+							if(strcmp(array_read.array_name, array_write.array_name) == 0)
+							{
+								int write_val = array_write.ind_var_x * j + array_write.ind_var_y;
+								if(read_val == write_val)
+								{
+									errs()<<"(i="<<i<<",i="<<j<<")\n";
+									errs()<<array_write.array_name<<":S"<<k+1<<" --A--> S"<<s+1<<"\n";
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
 	/*====Output Dependency====*/
 	errs()<<"====Output Dependency====\n";
+	for(int k = 0;k < statement_total;k++)							//choose a statement
+	{
+		array_element_type array_write1 = statement_vec[k].back();
+		for(int i = ind_var_lowerbound;i < ind_var_upperbound;i++)	//choose an iteration
+		{
+			int write_val1 = array_write1.ind_var_x * i + array_write1.ind_var_y;
+			for(int j = i;j < ind_var_upperbound;j++)				//only behind this iteration can have dependent
+			{
+				if(j == i)											//check tail of statement in this iteration
+				{
+					for(int s = k + 1;s < statement_total;s++)		//tail of statement
+					{
+						array_element_type array_write2 = statement_vec[s].back();	//the last one is assign's LHS
+						if(strcmp(array_write1.array_name, array_write2.array_name) == 0)
+						{
+							int write_val2 = array_write2.ind_var_x * j + array_write2.ind_var_y;
+							if(write_val1 == write_val2)
+							{
+								errs()<<"(i="<<i<<",i="<<j<<")\n";
+								errs()<<array_write1.array_name<<":S"<<k+1<<" -----> S"<<s+1<<"\n";
+							}
+						}
+					}
+				}
+				else
+				{
+					for(int s = 0;s < statement_total;s++)		//all of statement
+					{
+						array_element_type array_write2 = statement_vec[s].back();	//the last one is assign's LHS
+						if(strcmp(array_write1.array_name, array_write2.array_name) == 0)
+						{
+							int write_val2 = array_write2.ind_var_x * j + array_write2.ind_var_y;
+							if(write_val1 == write_val2)
+							{
+								errs()<<"(i="<<i<<",i="<<j<<")\n";
+								errs()<<array_write1.array_name<<":S"<<k+1<<" --O--> S"<<s+1<<"\n";
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
-	errs() << "[HW1]: " << F.getName() << '\n';
 	return PreservedAnalyses::all();
 }
 
