@@ -18,6 +18,8 @@ SmallVector<pair<string, string>, 20> TDEF;
 SmallVector<pair<string, string>, 20> TEQUIV;
 
 string gen_name;
+
+//The last TREF element
 string ref_name;
 
 namespace {
@@ -32,27 +34,26 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 		//In this work, only one basicBlock
 		for(Instruction &I : BB)
 		{
-			//get TREF info
+			//Get TREF info
 			if(auto *LI = dyn_cast<LoadInst>(&I))
 			{
 				Value* val = LI->getPointerOperand();
 				if(val->hasName())
-				{		
+				{
 					ref_name = val->getName().str();
 					TREF.push_back(ref_name);
-
 				}
-				else
+				else	//val is a reference pointer
 				{
 					ref_name = "*" + TREF.back();
 					TREF.push_back(ref_name);
 				}
 			}
 
-			//first check TREF & TEQUIV co-alias, then get TGEN info
+			//Check TREF & TEQUIV co-alias
 			if(auto *SI = dyn_cast<StoreInst>(&I))
 			{
-				//check TEQUIV whether have the pointer point to same address
+				//Check TEQUIV whether have the pointer point to same address
 				for(int i = 0; i < TREF.size(); i++)
 				{
 					for(int j = 0; j < TEQUIV.size(); j++)
@@ -61,7 +62,7 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 						{
 							string TREF_add = TEQUIV[j].second;
 							int flag = 0;
-							for(int k = 0; k < TREF.size(); k++)
+							for(int k = 0; k < TREF.size(); k++)	//avoid repeat again
 							{
 								if(TREF_add == TREF[k])
 								{
@@ -78,7 +79,7 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 						{
 							string TREF_add = TEQUIV[j].first;
 							int flag = 0;
-							for(int k = 0; k < TREF.size(); k++)
+							for(int k = 0; k < TREF.size(); k++)	//avoid repeat again
 							{
 								if(TREF_add == TREF[k])
 								{
@@ -93,8 +94,12 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 						}
 					}
 				}
+			}
 
-				//
+			//Get TGEN info
+			if(auto *SI = dyn_cast<StoreInst>(&I))
+			{
+				//LHS of store instruction
 				Value* val = SI->getOperand(1);
 				if(val->hasName())
 				{
@@ -106,7 +111,7 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 				}
 				TGEN.push_back(gen_name);
 
-				//check TEQUIV whether have the pointer point to same address
+				//Check TEQUIV whether have the pointer point to same address
 				for(int i = 0; i < TEQUIV.size(); i++)
 				{
 					if(gen_name == TEQUIV[i].first)
@@ -120,10 +125,10 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 				}
 			}
 
-			//get DEP info
+			//Get DEP info
 			if(auto *SI = dyn_cast<StoreInst>(&I))
 			{
-				//find flow dependence : intersection TREF(Si) & TDEF
+				//Find flow dependence : intersection TDEF & TREF(Si)
 				for(int i = 0; i < TDEF.size(); i++)
 				{
 					for(int j = 0; j < TREF.size(); j++)
@@ -136,7 +141,7 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 					}
 				}
 
-				//find output dependence : intersection TDEF & TGEN(Si)
+				//Find output dependence : intersection TDEF & TGEN(Si)
 				for(int i = 0; i < TDEF.size(); i++)
 				{
 					for(int j = 0; j < TGEN.size(); j++)
@@ -153,13 +158,14 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 			//Update TDEF info
 			if(auto *SI = dyn_cast<StoreInst>(&I))
 			{
+				//Remove (TGEN & TDEF)'s intersection
 				SmallVector<int, 20> delete_pos;
 				SmallVector<pair<string, string>, 20> next_TDEF;
 				for(int i = 0; i < TGEN.size(); i++)
 				{
 					for(int j = 0; j < TDEF.size(); j++)
 					{
-						//pointer point to the TGEN's element need to be remove
+						//TGEN's element need to be remove from TDEF
 						if(TGEN[i] == TDEF[j].first)
 						{
 							delete_pos.push_back(j);
@@ -187,34 +193,10 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 				}
 				TDEF = next_TDEF;
 
+				//Add TGEN's element into TDEF
 				for(int i = 0; i < TGEN.size(); i++)
 				{
 					TDEF.push_back(pair{TGEN[i], "S" + to_string(statement_id)});
-				}
-
-				//check TEQUIV whether have the pointer point to same address
-				for(int i = 0; i < TEQUIV.size(); i++)
-				{
-					if(gen_name == TEQUIV[i].first)
-					{
-						for(int j = 0; j < TDEF.size(); j++)	//update TDEF
-						{
-							if(TEQUIV[i].second == TDEF[j].first)
-							{
-								TDEF[j].second = "S" + to_string(statement_id);
-							}
-						}
-					}
-					else if(gen_name == TEQUIV[i].second)
-					{
-						for(int j = 0; j < TDEF.size(); j++)	//update TDEF
-						{
-							if(TEQUIV[i].first == TDEF[j].first)
-							{
-								TDEF[j].second = "S" + to_string(statement_id);
-							}
-						}
-					}
 				}
 			}
 
@@ -224,13 +206,14 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 				Value* val = SI->getOperand(0);
 				if(val->getType()->getTypeID() == llvm::Type::PointerTyID)	//RHS is a pointer
 				{
+					//Remove (('*'+TGEN) & TEQUIV)'s intersection
 					SmallVector<int, 20> delete_pos;
 					SmallVector<pair<string, string>, 20> next_TEQUIV;
 					for(int i = 0; i < TGEN.size(); i++)
 					{
 						for(int j = 0; j < TEQUIV.size(); j++)
 						{
-							//pointer point to the TGEN's element need to be remove
+							//Pointer point to the TGEN's element need to be remove
 							if(("*" + TGEN[i]) == TEQUIV[j].first)
 							{
 								delete_pos.push_back(j);
@@ -258,6 +241,7 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 					}
 					TEQUIV = next_TEQUIV;
 
+					//Add update TEQUIV element
 					for(int i = 0; i < TGEN.size(); i++)
 					{
 						string LHS_pointer_name = "*" + TGEN[i];
@@ -265,6 +249,7 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 						TEQUIV.push_back(pair{LHS_pointer_name, RHS_pointer_name});
 					}
 
+					//Add other alias pair
 					int TEQUIV_size = TEQUIV.size();
 					for(int i = 0; i < TEQUIV_size - 1; i++)
 					{
@@ -281,7 +266,8 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
 				}
 			}
 
-			if(auto *SI = dyn_cast<StoreInst>(&I))	//print statement result
+			//print statement result
+			if(auto *SI = dyn_cast<StoreInst>(&I))
 			{
 				if(!first_statement)
 				{
